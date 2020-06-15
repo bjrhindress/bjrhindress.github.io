@@ -1,0 +1,837 @@
+---
+title: "Political Opportunities in PA and Ohio"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+By: Alisa Hartle, Honghua Li, Brian Rhindress
+
+## Project Overview
+In the current polarizing political climate, understanding electoral trends is crucial. Our goal is to analyze county-wide demographics joined with electoral results from the 2018 midterm elections. To restrict our analysis and find more specific conclusions, we are focusing on two major swing states: Pennsylvania and Ohio. 
+
+Despite geographic proximity and historical similarities, Pennsylvania and Ohio have different political leanings. While both swing states, [in statewide 2018 elections](https://www.nytimes.com/2018/11/13/us/politics/midterm-results-democratic-gains.html) Pennsylvania voted decidedly Democrat while Ohio remained a Republican stronghold. We plan to explore demographics and historical trends to pinpoint similarities, differences, and potential political strategies in these states. We will focus voter data analysis for these states by exploring key ideas: voter turnout, comparing urban and rural counties, and voting patterns in relation to education.
+
+We are using three datasets in our analysis, all sourced from [MIT Election Lab](https://electionlab.mit.edu/data?fbclid=IwAR2BNO6raXVhtzv9MCsy3CF1KQAU402TwjId1cR3ZSJ4mWjIXm7ZwNtkDes). All information is organized by county. The datasets include: 2018 election returns for Pennsylvania, 2018 returns for Ohio, and a comprehensive file with demographic overviews, total voting population, and vote counts for previous elections going back to 2014. Demographic characteristics include education, race, median household income, age, and gender. We acknowledge our analysis is somewhat limited to examining demographic totals by county. However, our aim is largely to see if what we know about individual voting habits from research can be translated into political strategy on an aggregate level. 
+
+#Data Definitions
+```{r message = FALSE}
+library(readr)
+datadefined <- read_csv("Data Definitions.csv")
+datadefined <-subset(datadefined[,c(1:2)])
+datadefined
+```
+
+#Dataset Overview:
+
+PA Number of counties:  65
+
+* Distribution of county size: 
+
+    + Min. 3,935 
+    + Max: 1,120,330
+    + Median: 70,165
+    + Mean: 145,162
+
+* PA Voted for Obama in 2012: 2,963,521
+
+* PA Voted for Trump in 2016: 2,970,733
+
+OH Number of counties: 88 
+
+* Distribution of county size:
+
+    + Min. 10,095 
+    + Max: 956,050
+    + Median: 43,528
+    + Mean: 99,252
+
+* Voted for Obama in 2012:2,827,621
+
+* Voted for Trump in 2016: 2,841,005
+
+
+# Demonstration of R Skills 
+This project will make use of our R skills in and outside of class, including: 
+
+* Reading in, cleaning and merging data sets
+
+* Installing, importing and utilizing libraries such as readr, dplyr, reshape2, ggplot2, stringr
+
+* Writing and importing functions using source()
+
+* Generating R Markdown reports
+
+* Creating an RShiny Application
+
+# Getting Started
+
+```{r results = "hide", message=FALSE}
+#Importing data 
+source("PAmerge.R")
+PA <- getPA() #FINAL PA DATA SET 
+source("OHmerge.R")
+OH <- getOH() #FINAL OH DATA SET 
+NAT <- data.frame(read_csv("past_elections.csv"))
+
+```
+
+```{r echo=FALSE,results='hide'}
+names(PA)
+names(OH)
+
+#summary(PA) 
+#summary(OH) 
+
+summary(PA$cvap) #county voting age population
+summary(OH$cvap)
+
+sum(PA$obama12)
+sum(PA$trump16)
+sum(OH$obama12)
+sum(OH$trump16)
+
+```
+
+# Section A: Voter Turnout Hypotheses/Analysis (Pt. I)
+
+[Four out of every ten eligible voting adults do not vote.](https://www.nytimes.com/interactive/2016/09/13/us/politics/what-separates-voters-and-nonvoters.html?mtrref=undefined) Variations in state-to-state turnout may be explained by degree of race competitiveness, voter registration rules, and state demographics.  For instance, voter turnout typically increases with wealth, age and education levels. Also, holding other characteristics constant, black voters (and black women, especially) turn out at rates higher than any other demographic group. Midterm elections usually have [lower turnout than general elections](https://www.brookings.edu/blog/brookings-now/2018/09/25/how-voter-turnout-could-affect-the-2018-midterm-elections/), and the president’s party usually loses. We will explore these trends by investigating the following hypotheses: 
+
+* Hypothesis: As competitive swing states, PA and OH will have higher overall voter turnout than the US as a whole. PA will have higher voter turnout than OH due to higher successful mobilization for democratic candidates.
+
+    + Total voter turnout by state, nationally:
+        
+        + As shown in the bar graph and tables below, both Ohio and PA had higher average voter turnout in the 2016 presidential election by 2.15% +/- .05%. 
+        
+         + In the 2018 midterms, both states saw significant drops in voter turnout with PA (-1,259,034 or -12.9%) and OH (-1,178,393 or -13.5%).
+    
+
+```{r message=FALSE, echo=FALSE}
+#Section 1: Comparisons of Voter Turnout by state, nationally 
+library(ggplot2)
+
+#Generates total sum of select races 
+voterTotaler <- function(X) {
+  voterTotals <- sapply(X[,4:length(X)],sum) # sum of each numeric field
+  
+  presTotals2016 <- voterTotals[c("trump16","clinton16","otherpres16")]
+  sum(presTotals2016) # total PA presidential 2016 votes 
+  
+  govTotals18 <- voterTotals[c("Dgov18","Ggov18","Lgov18","Rgov18")]
+  sum(govTotals18) # total PA midterm governor 2018 votes
+  
+  congressTotals18 <- voterTotals[c("Dcongress18","Lcongress18","Rcongress18")]
+  sum(congressTotals18) # total PA midterm congress 2018 votes
+  
+  totals<- data.frame(c(sum(presTotals2016),sum(govTotals18),sum(congressTotals18)), row.names = c("pres2016","gov18","congress18"))
+  colnames(totals) <- "TotalVotes"
+  return(totals)
+}
+
+#Add columns for population percentages 
+PAvotes <- voterTotaler(PA)
+PAtotals <- cbind(PAvotes,PAvotes/sum(PA$total_population), PAvotes/sum(PA$cvap))
+colnames(PAtotals) <- c("PA Votes", "Total_pop_pct", "Elig_Voter_pct")
+
+OHvotes <- voterTotaler(OH)
+OHtotals <- cbind(OHvotes,OHvotes/sum(OH$total_population), OHvotes/sum(OH$cvap))
+colnames(OHtotals) <- c("OH Votes", "Total_pop_pct", "Elig_Voter_pct")
+
+NATvotes <- voterTotaler(NAT)
+NATtotals <- cbind(NATvotes, NATvotes/sum(na.omit(NAT$total_population)), NATvotes/sum(na.omit(NAT$cvap)))
+colnames(NATtotals) <- c("Nat Votes", "Total_pop_pct","Elig_Voter_pct")
+
+#Histogram plots 
+ggdata <- data.frame(geography=c("PA","OH","USA"), Elig_Voter_pct=c(PAtotals["pres2016","Elig_Voter_pct"],OHtotals["pres2016","Elig_Voter_pct"],NATtotals["pres2016","Elig_Voter_pct"]))
+
+ggplot(ggdata, aes(x=geography,y=Elig_Voter_pct,fill=geography)) + geom_bar(stat = "identity") + coord_cartesian(ylim=c(0.50, 0.65))
+
+#Generate voter turnout tables 
+library(knitr)
+PAtotals <- PAtotals[-2]
+names(PAtotals) <- c("Votes", "Per Eligible") 
+kable(PAtotals, caption="PA totals",align = 'r')
+OHtotals <- OHtotals[-2]
+names(OHtotals) <- c("Votes", "Per Eligible") 
+kable(OHtotals, caption="OH totals",align = 'r')
+NATtotals <- NATtotals[-2]
+names(NATtotals) <- c("Votes", "Per Eligible") 
+kable(NATtotals[1,], caption="National totals")
+
+``` 
+
+# Voter Turnout Pt. II 
+
+* Comparison across party lines 
+    
+    + In the 2018 midterms, two trends emerge. 1) Republican turnout decreased at a greater rate in both PA (-988,872 or -10.2%) and in OH (-653,386 or -7.5%). 2) Democrat turnout decreased in greater proprortions in Ohio (-4.4%) than in PA (-1.3%). This helps to explain why PA flipped so many seats while Ohio did not. 
+
+
+```{r echo=FALSE, message=FALSE}
+
+#total trump, Dgov18, Rgov18 
+PAcomps <- data.frame(votes=c(
+  sum(PA$clinton16),
+  sum(PA$Dgov18),
+  sum(PA$trump16),
+  sum(PA$Rgov18)), race=c("Clinton16","DGov18","Trump16","RGov18"),party=c("D","D","R","R"))
+
+PAcomps$race <- factor(PAcomps$race,levels=PAcomps$race)
+
+OHcomps <- data.frame(votes=c(
+  sum(OH$clinton16),
+  sum(OH$Dgov18),
+  sum(OH$trump16),
+  sum(OH$Rgov18)), race=c("Clinton16","DGov18","Trump16","RGov18"),party=c("D","D","R","R"))
+OHcomps$race <- factor(OHcomps$race,levels=OHcomps$race)
+
+#Plot voter turnout graph comparisons 
+PAgg <- ggplot(PAcomps,aes(x=race,y=votes,fill=party)) + geom_bar(stat="identity") + scale_fill_manual(values=c("#00bfff","#ff6347")) + theme(legend.position="none") + labs(title="PA Voter Totals")
+
+OHgg <- ggplot(OHcomps,aes(x=race,y=votes,fill=party)) + geom_bar(stat="identity")  + scale_fill_manual(values=c("#00bfff","#ff6347")) + theme(legend.position="right") + labs(title="Ohio Voter Totals")
+
+#find race differences 
+differences <- c(
+ filter(PAcomps, race=="DGov18")$votes- filter(PAcomps, race=="Clinton16")$votes,
+  filter(PAcomps, race=="RGov18")$votes-filter(PAcomps, race=="Trump16")$votes,
+  filter(OHcomps, race=="DGov18")$votes-filter(OHcomps, race=="Clinton16")$votes,
+  filter(OHcomps, race=="RGov18")$votes-  filter(OHcomps, race=="Trump16")$votes)
+
+turnout_diff <- data.frame(party=c("PADems","PAReps","OHDems","OHReps"),difference=differences)
+
+turnoutpct_diff <- data.frame(party=c("PADems","PAReps","OHDems","OHReps"),difference=c(differences[1:2]/sum(PA$cvap), differences[3:4]/sum(OH$cvap)))
+
+#Plot race differences 
+turnout_gg <- ggplot(turnout_diff,aes(x=party,y=difference,fill=party)) + geom_bar(stat="identity")  + scale_fill_manual(values=c("#00bfff","#ff6347","#00bfff","#ff6347")) + theme(legend.position="none") + labs(title="2016 to 2018 Voter Decreases")
+
+turnoutpct_gg <- ggplot(turnoutpct_diff,aes(x=party,y=difference,fill=party)) + geom_bar(stat="identity")  + scale_fill_manual(values=c("#00bfff","#ff6347","#00bfff","#ff6347")) + theme(legend.position="none") + labs(title="2016 to 2018 Voter % Decreases")
+
+library(gridExtra)
+grid.arrange(PAgg, OHgg, ncol=2)  # arrange
+grid.arrange(turnout_gg, turnoutpct_gg, ncol=2)  # arrange
+
+```
+
+# Voter Turnout Pt. III
+
+* Hypothesis: By county in PA and OH, competitive races will have higher voter turnout rates.  
+
+    + Total PA turnout was generally higher for counties that swung Democrat, which can primarily be accounted for by the size of Democrat-leaning voters in large, urban counties. When scaling turnout by proportion of eligible voters, this phenomenon only marginally decreased. 
+        
+  + OH mirrored these trends, albeit with fewer counties voting democrat. 
+      
+    
+```{r echo=FALSE, message = FALSE}
+
+#Augment for flipped races 
+countyTurnouts18 <- function(X) {
+  
+  state <- deparse(substitute(X))
+  
+  for(i in seq(1:length(X[[1]]))){
+    if(X[i,"Dgov18"]>X[i,"Rgov18"]){
+      X[i,"party"] <- "D"
+      if(X[i,"trump16"]>X[i,"clinton16"]){
+        X[i,"flipped"] <- "D"
+      }
+    }else{
+      X[i,"party"] <- "R"
+      if(X[i,"trump16"]<X[i,"clinton16"]){
+        X[i,"flipped"]<-"R"}
+    }
+  }
+  Gov18Turnout <- data.frame(votes=X$Dgov18+X$Rgov18+X$Ggov18+X$Lgov18,county=X$county, party=X$party)
+  Gov18Turnout$eligibleTurnout <- Gov18Turnout$votes/X$cvap
+    Gov18Turnout$margin <- abs(X$Dgov18-X$Ggov18)
+
+  
+  Gov18Turnout <- Gov18Turnout[order(Gov18Turnout$votes),]
+  Gov18Turnout$county <- factor(Gov18Turnout$county, levels = Gov18Turnout$county)
+  county_gg <- ggplot(Gov18Turnout,aes(x=county,y=votes,color=party)) + geom_point()  + 
+    theme(legend.position="right",axis.text.x = element_blank()) + labs(title=paste(state," Total 2018 Turnout by County")) + scale_color_manual(values=c("#00bfff","#ff6347"))
+  
+  Gov18Turnout <- Gov18Turnout[order(Gov18Turnout$eligibleTurnout),]
+  Gov18Turnout$county <- factor(Gov18Turnout$county, levels = Gov18Turnout$county)
+  countypct_gg <- ggplot(Gov18Turnout,aes(x=county,y=eligibleTurnout,color=party)) + geom_point()  + 
+    theme(legend.position="none",axis.text.x = element_blank()) + labs(title=paste(state," 2018 Turnout by County Percentage of Eligible Voters")) + scale_color_manual(values=c("#00bfff","#ff6347"))
+  
+grid.arrange(county_gg, countypct_gg, ncol=1)
+  
+  return(Gov18Turnout)
+}
+
+#Join for mapping purposes 
+PATurnouts18 <- inner_join(countyTurnouts18(PA),PA[,c("county","cvap")],by = "county")
+OHTurnouts18 <- inner_join(countyTurnouts18(OH),OH[,c("county","cvap")], by = "county")
+
+```
+
+* As shown below, there is a clear trend in PA for almost all Democrat-won races to have larger margin-wins and higher voter turnout than Republican races. This may seem to reject the hypothesis that more competitive races (smaller margins) have higher turnout rates. In fact, it appears that the smaller the margin, the lower the turnout, even when scaled proportionally. 
+  
+* As before, this trend is less pronounced in OH.  While Democrat-won races had larger margins, the proportional turnout was approximately the same as republican races.  
+
+
+```{r echo=FALSE}
+#Heat Maps 
+ggplot(PATurnouts18,aes(x=margin/cvap,y=eligibleTurnout,color=party)) + geom_point() + theme(legend.position="right") + labs(title="PA 2018 Margins v. Turnout")+ scale_color_manual(values=c("#00bfff","#ff6347"))
+  
+ggplot(OHTurnouts18,aes(x=margin/cvap,y=eligibleTurnout,color=party)) + geom_point() + theme(legend.position="right") + labs(title="OH 2018 Margins v. Turnout")+ scale_color_manual(values=c("#00bfff","#ff6347"))
+  
+```
+
+
+
+# Voter Turnout Pt. IV
+    
+* The counties with the closest margins in PA and OH are shown below. Tighter margins seem more correlated with smaller county population than turnout rates. 
+
+* The following heat map shows the percentage of voter turnout as a proportion of eligible voters. While PA seems to have higher overall turnout, in reality both states have on average the same turnout. This may be accounted by higher rates of suburbanization in PA, which makes the PA map look more evenly spread.
+    
+```{r echo=FALSE}
+
+#Generate tables for closest margin 
+kable(top_n(PATurnouts18[-1],-5,margin ),caption="PA Top 5 closest margin Counties")
+kable(top_n(OHTurnouts18[-1],-5,margin),caption="OH Top 5 closest margin Counties")
+
+```
+
+
+```{r echo=FALSE, message = FALSE}
+
+#Mapping PA and OH
+  counties <- map_data("county")
+  pacounty <- subset(counties, region == "pennsylvania")
+  pacounty <- mutate(pacounty,county=subregion)
+  pa_gradients <- inner_join(pacounty,PATurnouts18, by ="county")
+  
+  library(viridis)
+
+ggplot(data=pacounty)+ geom_polygon(aes(x=long,y=lat,group=group), fill='white', color='black')+
+    coord_fixed(1.3) + geom_polygon(data=pa_gradients,aes(x=long,y=lat,group=group,fill=eligibleTurnout), color='black') +
+   scale_fill_viridis(breaks = c(0.1, .2, .3, .4, .5, .6))
+
+  counties <- map_data("county")
+  ohcounty <- subset(counties, region == "ohio")
+  ohcounty <- mutate(ohcounty,county=subregion)
+  oh_gradients <- inner_join(ohcounty,OHTurnouts18, by ="county")
+  
+ggplot(data=ohcounty)+ geom_polygon(aes(x=long,y=lat,group=group), fill='white', color='black')+
+    coord_fixed(1.3) + geom_polygon(data=oh_gradients,aes(x=long,y=lat,group=group,fill=eligibleTurnout), color='black') +
+   scale_fill_viridis(breaks = c(0.1, .2, .3, .4, .5, .6))  + 
+    theme(legend.position="none")
+
+
+```
+  
+    
+# PA Flipped Counties
+    
+  * While both PA and OH saw 13 counties flip, PA saw most of those counties swing blue, while OH saw a shift to red. 
+    
+```{r echo=FALSE}
+#Find all races that flipped, relative to 2016 election, map 
+races <- c(c("Dgov18","Rgov18"),c("Dcongress18","Rcongress18"),c("Dussen18","Russen18"),c("Dstatesen18","Rstatesen18"),c("Dstaterep18","Rstaterep18"))
+
+findFlipped <- function(X,races){
+  flippedRaces <- c()
+  for(i in seq(from = 1, to=length(races), by=2)){
+    dem <- races[i]
+    rep <- races[i+1]
+  
+    flippedRaces <- rbind(flippedRaces,filter(X,trump16>clinton16 & eval(parse(text=dem))>eval(parse(text=rep)))) 
+    flippedRaces<- rbind(flippedRaces,filter(X,trump16<clinton16 & eval(parse(text=dem))<eval(parse(text=rep)))) 
+  }
+  return(flippedRaces)
+}
+
+PAflipped <- distinct(findFlipped(PA,races))
+OHflipped <- distinct(findFlipped(OH,races))
+
+mapFlipped <- function(PAflipped, PATurnouts18,state) {
+  counties <- map_data("county")
+  pacounty <- subset(counties, region == state)
+  pacounty <- mutate(pacounty,county=subregion)
+  PAflipped <- inner_join(PAflipped, PATurnouts18, by = "county")
+  paflipped_map <- inner_join(pacounty,PAflipped, by ="county")
+  parep_flip <- subset(paflipped_map, party =="R")
+  padem_flip <- subset(paflipped_map, party =="D")
+  
+  ggplot(data=pacounty)+ geom_polygon(aes(x=long,y=lat,group=group), fill='white', color='black')+
+    coord_fixed(1.3) + geom_polygon(data=parep_flip,aes(x=long,y=lat,group=group), fill='red', color='black') + geom_polygon(data=padem_flip,aes(x=long,y=lat,group=group), fill='blue', color='black')
+}
+
+mapFlipped(PAflipped,PATurnouts18,"pennsylvania")
+kable(select(inner_join(PAflipped,PATurnouts18, by="county"),county,party))
+```
+
+
+# OH Flipped Counties
+
+```{r echo=FALSE}
+mapFlipped(OHflipped, OHTurnouts18,"ohio")
+kable(select(inner_join(OHflipped,OHTurnouts18, by="county"),county,party))
+
+```
+  
+# Section B: Urban-Suburban-Rural Hypotheses
+
+According to Pew Research Center (2018), geographic proximity to urban centers can predict political leaning. In recent years, there has been divergence between rural and urban voters as rural voters become more Republican and urban voters become more Democratic. We will explore how Pew’s trends apply to Pennsylvania and Ohio by testing the following hypotheses. 
+
+* In PA and OH, rural counties are more likely to vote Republican and urban counties vote Democratic.
+  
+    + Where are urban/rural margins narrowest? We are expecting rural margins to be lower in regions with high education, and for urban margins to be lower income.
+  
+* Rural and urban counties are most likely to vote “straight ticket” by electing the same party in multiple offices.
+   
+    + For rural/urban districts that do not vote straight ticket, we’re hypothesising this has been a consistent trend.
+ 
+* Suburban districts are most likely to “flip” between election cycles. Our hypothesis is that counties that have shifted politically in 2018 have shown similar behavior in the past.
+  
+* Additional demographic indicators such as education, race, or income could predict which suburban districts are most likely to flip in midterm elections.
+
+Source: http://www.people-press.org/2018/03/20/1-trends-in-party-affiliation-among-demographic-groups/
+
+
+#Overview of Urban-Rural Counties in Pennsylvania and Ohio
+
+* Ruralurban_cc measures how rural an area is; 1 indicates counties of
+1,000,000 people or more, while indicates a county with population < 2,500
+
+* The summary statistics of these two states show that the median PA county is more "urban" than OH in terms of population density. However, PA also has a wider variation in county urban-rural spectrum (1-9 compared with OH's 1-8). 
+
+```{r echo = FALSE, message=FALSE, results=FALSE}
+
+hist(PA$ruralurban_cc, breaks = 5)
+hist(OH$ruralurban_cc, breaks =5)
+
+```
+
+* PA counties have a natural variation in population size between large, medium, and small. Ohio looks quite different. Ohio has high density populated counties like Pennyslvania, but fewer moderate-to-high denisty populated counties. This urban isolation in Ohio could play a factor in the differences uncovered in this analysis.
+
+#Comparing Rural, Suburuban, and Urban Counties
+* Out of 67 counties in Pennsylvania, 19 are rural, 21 are suburban, and 27 are urban.
+
+* Out of 88 counties in Ohio, 28 are rural, 27 are suburbs, and 33 are urban.
+
+* In both states, an increase in "ruralness" correlates to an increase in % white population,%population over 65, and % of population with less than high school or college. 
+
+* More rural counties, however, are also correlated with  decreases in % of the population that is black, hispanic,or foreign-born as well as median household income. 
+```{r echo = FALSE, message = FALSE, results=FALSE}
+pa_urban <-subset(PA, PA$ruralurban_cc == 1)
+pa_suburb <- subset(PA, PA$ruralurban_cc == 2|
+                    PA$ruralurban_cc == 3 |
+                     PA$ruralurban_cc == 4 | 
+                     PA$ruralurban_cc == 5)
+pa_rural <- subset(PA, PA$ruralurban_cc == 6 |
+                  PA$ruralurban_cc == 7 | 
+                  PA$ruralurban_cc == 8|
+                  PA$ruralurban_cc == 9|
+                  PA$ruralurban_cc == 10)
+
+oh_urban <-subset(OH, OH$ruralurban_cc == 1)
+oh_suburb <- subset(OH, OH$ruralurban_cc == 2|
+                      OH$ruralurban_cc == 3 |
+                     OH$ruralurban_cc == 4 | 
+                     OH$ruralurban_cc == 5)
+oh_rural <- subset(OH, OH$ruralurban_cc == 6 |
+                  OH$ruralurban_cc == 7 | 
+                  OH$ruralurban_cc == 8|
+                  OH$ruralurban_cc == 9|
+                  OH$ruralurban_cc == 10)
+```
+
+
+```{r echo=FALSE, results =FALSE}
+comparepa <-cor(PA[,24:35], PA$ruralurban_cc)
+library(corrplot)
+corrplot(comparepa, method = "square", main = "PA RuralUrban_cc Correlations")
+
+compareoh <-cor(OH[,24:35], OH$ruralurban_cc)
+corrplot(compareoh, method = "square", main = "OH RuralUrban_CC Correlations")
+
+```
+
+
+```{r echo = FALSE, message=FALSE, results=FALSE}
+#Vote Test Function
+#vote_test provides a basic framework to compare percentage of voters for a certain party between two datasets
+#a and b are the datasets being compared
+#c and d are the races we're examining; we're looking at c as a percentage of (c+d)
+vote_test <- function(a, b, c, d) {
+  vote_test <-t.test(a[,c]/(a[,c]+a[,d]), b[,c]/(b[,c]+b[,d]))
+  return(vote_test)
+}
+
+```
+
+
+#Hypothesis 2a: rural counties are more likely to vote Republican and urban counties are more likely to vote Democratic
+* We can reject the null hypothesis and confirm that for the 2018 national midterm elections in PA and OH, there are clear leanings towards Democratic candidates for urban counties and clear inclinations for rural counties to vote Republican. 
+
+  * It's worth nothing that the differences between urban and rural voters in Ohio are smaller than the differences in Pennyslvania, although both are statistically significant (maximum p-value = .0013, min t-stat = 3.6).
+
+```{r echo=FALSE, message=FALSE,results=FALSE} 
+#PA comparisons
+vote_test(a=pa_rural,b=pa_urban, c="Dcongress18",d="Rcongress18")
+vote_test(a=pa_rural,b=pa_urban, c="Dussen18",d="Russen18")
+
+#OH comparisons
+vote_test(a=oh_rural,b=oh_urban, c="Dcongress18",d="Rcongress18")
+vote_test(a=oh_rural,b=oh_urban, c="Dussen18",d="Russen18")
+
+```
+
+#Hypothesis 2b: Which rural or urban counties have the lowest margins between Republican and Democrat? Are there any predictors for these counties?
+
+* There are 12 counties within PA and OH that show voter margins of less than 10% between Democrat and Republican voters.
+
+  * 9 of the 12 are considered suburuban counties; 3 are urban
+    
+* Suburban counties with narrow margins have a higher % of foreign born residents (p=and a lower % of white residents than more unipartisan counties.
+
+* Marginal suburban counties also show higher rates of education than other suburban counties
+```{r echo=FALSE, message=FALSE, results=FALSE}
+#diff calculates the difference in % of the vote between Republican and Democratic candidate
+diff <- function(df, rep, dem) {
+  diff <- abs((df[,rep]/(df[,rep]+df[,dem]))-(df[,dem]/(df[,rep]+df[,dem])))
+}
+
+PA_cong_marg <-subset(PA,diff(df=PA, "Rcongress18","Dcongress18")<.1)
+OH_cong_marg <-subset(OH,diff(df=OH, "Rcongress18","Dcongress18")<.1)
+
+margins <-rbind(PA_cong_marg[1:39],OH_cong_marg[1:39])
+pre_merge <-subset(PA,diff(df=PA, "Rcongress18","Dcongress18")>.1)
+pre_merge2 <-subset(OH,diff(df=OH, "Rcongress18","Dcongress18")>.1)
+PAOHmerge <-rbind(pre_merge[1:39],pre_merge2[1:39]) 
+
+#PAOHmerge shows counties with smallest margins in 2018 Congressional races
+```
+
+
+```{r echo =FALSE,message=FALSE,results=FALSE}
+#potential indicators of "margins"
+#Since 9 of the 12 "margin" counties are suburban, we will compare those 9 to all other PA and OH suburban counties.
+
+margins <-subset(margins, margins$ruralurban_cc != 1)
+
+suburb1 <- subset(PAOHmerge, PAOHmerge$ruralurban_cc == 2|
+                      PAOHmerge$ruralurban_cc == 3 |
+                     PAOHmerge$ruralurban_cc == 4 | 
+                     PAOHmerge$ruralurban_cc == 5)
+```
+
+```{r results=TRUE,echo=FALSE,message=FALSE}
+t.test(margins$median_hh_inc,suburb1$median_hh_inc) #not statistically significant at 95% confidence interval (p=.1086, t= 1.75) 
+
+t.test(margins$black_pct,suburb1$black_pct) #statistically significant 
+
+#Counties where gaps between Republican and Democrat votes are lower also have a higher percentage of black residents (p=.083, t=1.96)
+
+
+t.test(margins$foreignborn_pct,suburb1$foreignborn_pct) #statistically significant
+boxplot(margins$foreignborn_pct,suburb1$foreignborn_pct, main ="Foreign Born %")
+#Narrower voter margins means higher percentage of foreign-born residents (p=.0047, t=3.66)
+
+
+t.test(margins$white_pct, suburb1$white_pct) #statistically significant
+boxplot(margins$white_pct, suburb1$white_pct, main = "White %")
+#Slim differences between Democrat and Republican votes equate to a lower percentage of the population that's white (p = .007, t=-3.42)
+
+t.test(margins$lesscollege_pct,suburb1$lesscollege_pct) #statistically significant
+boxplot(margins$lesscollege_pct,suburb1$lesscollege_pct, main = "% Residents with Less than College Education")
+#Counties with narrow voter margins have fewer residents with less than a college education (p=.009, t=-3.25)
+
+```
+
+
+#Hypothesis 2c: Rural and urban counties are most likely to vote “straight ticket” by electing the same party in multiple offices.
+
+* Straight ticket Democratic counties are clearly more urban as defined within the dataset, showing a range of (1-2) or (1-3) on the rural urban continuum scale
+
+* Straight ticket Republican counties for 2018 are more complicated. For both Pennsylvania and Ohio counties that voted majority Republican for all races ranged from 1-8 on the ruralurban_cc. 
+
+  + This could suggest that Republicans appeal to both rural and urban counties throughout PA and OH, but it's more likely that the ruralurban_cc code is fairly limited for analysis on the county scale. A more localized analysis would reveal more.
+    
+```{r echo=FALSE, message=FALSE,results=FALSE}
+
+vote_test2 <- function(e, f, g) {
+  vote_test2 <-(e[,f]/(e[,f]+e[,g]))
+  return(vote_test2)
+}
+
+str_rep_oh <-subset(OH, vote_test2(OH,"Rcongress18","Dcongress18")>.5 &
+    vote_test2(OH,"Rgov18","Dgov18")>.5 &
+    vote_test2(OH,"Rstaterep18","Dstaterep18")>.5 &
+    vote_test2(OH,"Rstatesen18","Dstatesen18")>.5 &
+    vote_test2(OH,"Russen18","Dussen18")>.5)
+
+str_dem_oh <-subset(OH, vote_test2(OH,"Rcongress18","Dcongress18")<.5 &
+    vote_test2(OH,"Rgov18","Dgov18")<.5 &
+    vote_test2(OH,"Rstaterep18","Dstaterep18")<.5 &
+    vote_test2(OH,"Rstatesen18","Dstatesen18")<.5 &
+    vote_test2(OH,"Russen18","Dussen18")<.5)
+
+str_rep_pa <-subset(PA, vote_test2(PA,"Rcongress18","Dcongress18")>.5 &
+    vote_test2(PA,"Rgov18","Dgov18")>.5 &
+    vote_test2(PA,"Rstaterep18","Dstaterep18")>.5 &
+    vote_test2(PA,"Rstatesen18","Dstatesen18")>.5 &
+    vote_test2(PA,"Russen18","Dussen18")>.5)
+
+str_dem_pa <-subset(PA, vote_test2(PA,"Rcongress18","Dcongress18")<.5 &
+    vote_test2(PA,"Rgov18","Dgov18")<.5 &
+    vote_test2(PA,"Rstaterep18","Dstaterep18")<.5 &
+    vote_test2(PA,"Rstatesen18","Dstatesen18")<.5 &
+    vote_test2(PA,"Russen18","Dussen18")<.5)
+
+summary(str_rep_oh$ruralurban_cc)
+summary(str_dem_oh$ruralurban_cc)
+summary(str_rep_pa$ruralurban_cc)
+summary(str_dem_pa$ruralurban_cc)
+
+```
+
+
+#Hypothesis 2d: For rural/urban districts that do not vote straight ticket, This has been a consistent trend.
+
+* In PA, 29 out of 67 counties voted straight ticket one way or the other in 2018
+
+  + 56 counties voted straight ticket in 2016.
+    
+  + There were 3 PA counties that voted straight ticket in 2018 that did not in 2016.
+
+*In OH, 42 out of 88 counties voted straight ticket (Democrat or Republican) in 2018
+
+  + In 2016, there were 78 out of 88 counties that voted straight ticket between the presidential, congressional, and senate races.
+    
+  + 5 OH counties voted straight ticket in 2018 that did not in 2016. 
+  
+```{r echo=FALSE,message=FALSE,results=FALSE}
+PAcrooked <- subset(PA, !((PA$county %in% str_rep_pa$county) | (PA$county %in% str_dem_pa$county)))
+
+OHcrooked <- subset(OH, !((OH$county %in% str_rep_oh$county) | (OH$county %in% str_dem_oh$county)))
+
+
+
+PAcrooked2 <-subset(PAcrooked,
+    abs(vote_test2(PAcrooked,"trump16","clinton16"))>.5 &
+    abs(vote_test2(PAcrooked,"repsen16","demsen16"))>.5 &
+    abs(vote_test2(PAcrooked,"rephouse16","demhouse16"))>.5)
+summary(PAcrooked2$ruralurban_cc)
+#PAcrooked3 is to see how many counties straight ticket in 2016
+
+PAcrooked3 <-subset(PA, 
+    abs(vote_test2(PA,"trump16","clinton16"))>.5 &
+    abs(vote_test2(PA,"repsen16","demsen16"))>.5 &
+    abs(vote_test2(PA,"rephouse16","demhouse16"))>.5)
+summary(PAcrooked3$ruralurban_cc) #straight ticket counties were slightly more rural in PA in 2016
+
+
+
+OHcrooked2 <-subset(OHcrooked,
+    abs(vote_test2(OHcrooked,"trump16","clinton16"))>.5 &
+    abs(vote_test2(OHcrooked,"repsen16","demsen16"))>.5 &
+    abs(vote_test2(OHcrooked,"rephouse16","demhouse16"))>.5)
+
+OHcrooked3 <-subset(OH,
+    abs(vote_test2(OH,"trump16","clinton16"))>.5 &
+    abs(vote_test2(OH,"repsen16","demsen16"))>.5 &
+    abs(vote_test2(OH,"rephouse16","demhouse16"))>.5)
+
+
+
+#Unfortunately, now that we better understand the limitations of this dataset, it's clear we do not have enough data from 2014 and 2012 to proceed further in straight-ticket analysis. Since there is only one race from 2014 (governor) and 2012 (president) we can only compare 2018 and 2016.
+```
+
+
+#Hypothesis 2e: Suburban districts are most likely to not vote straight ticket.
+
+*For Pennyslvania:
+    
+  * There is likely no difference in "ruralness" between counties that voted straight ticket Republican in 2016 and 2018 and those that had mixed ballots(p=.191). 
+
+  * Between mixed ballots and straight ticket Democrat counties, there is a clear difference in ruralness. Democratic counties are notedly more urban (p<.0001). 
+
+*For Ohio:
+  
+  * Ohio mixed ballot counties are similarly distinct in "ruralness" from straight ticket Democratic counties(p<.0001). 
+    
+  * The differences between mixed ballot and counties that voted straight ticket Republican in 2016 and 2018, however, are larger. While not within the 95% confidence interval necessary to reject the null hypothesis(p=.065), these results are closer to what we'd expect than in PA. 
+
+```{r echo=FALSE,results=FALSE,message=FALSE}
+summary(PAcrooked2$ruralurban_cc)
+summary(OHcrooked2$ruralurban_cc)
+
+boxplot(PAcrooked2$ruralurban_cc, main="Ruralness of PA split ticket counties")
+boxplot(OHcrooked2$ruralurban_cc, main = "Ruralness of OH split ticket counties")
+
+t.test(PAcrooked2$ruralurban_cc, str_rep_pa$ruralurban_cc)
+t.test(PAcrooked2$ruralurban_cc, str_dem_pa$ruralurban_cc)
+
+#The results of these t-test show that, for PA, there is likely no difference in "ruralness" (p-value .1909) between counties that voted straight ticket Republican in 2016 and 2018 and those that had mixed ballots. What's interesting is that between the mixed ballots and straight ticket Democrat counties, there is a clear difference in the rural urban continuum. Democratic counties are notedly more urban (1.5 compared to 4.4). 
+
+#It is possible that there is little urban-rural distinction between counties that vote consistently Republican and those that only do sometimes. However, it's also possible that the difference between urban, suburban, and rural voters is far more concentrated than a county-level analysis could uncover.
+
+t.test(OHcrooked2$ruralurban_cc, str_rep_oh$ruralurban_cc)
+t.test(OHcrooked2$ruralurban_cc, str_dem_oh$ruralurban_cc)
+
+#Ohio is different from Pennsylvania in an interesting way. Ohio mixed ballot counties are similarly distinct in "ruralness" from straight ticket Democratic counties. The differences between mixed ballot and counties that voted straight ticket Republican in 2016 and 2018, however, are larger (p-value .065). While not within the 95% confidence interval necessary to reject the null hypothesis, these results are closer to what we'd expect than in PA. 
+
+```
+
+# Section C: #Demographic Voting Trends Hypotheses
+According to new data released by the Pew Research Center, the education gap in partisan orientation is growing while gender and racial gap remains constant. Higher educational attainment is increasingly associated with Democratic Party affiliation and leaning. While, Black, Hispanic  voters remain overwhelmingly democratic. Among registered voters today, 56% of women are affiliated with or lean toward the Democratic Party, compared with 44% of men. We will test validity of these conditions in both Pennsylvania and Ohio by exploring the below hypotheses. 
+
+* Counties with more people with less than college education are more likely to vote for a democratic president.
+
+* Counties with more people with less than high school education are more likely to vote for a republican president.
+
+* Counties with more Women will have higher proportion of votes going to democratic president.
+
+* Counties with higher percentage of Black and Hispanic voters will have a higher proportion of votes going to     democratic president in comparison to Counties with higher proportion of White voters. 
+
+Testing methods:
+Running correlation coefficient tests and comparing percentage of votes for democratic/republican candidate in terms of eligible voters and specific population groups in percentage in each Counties.  
+
+```{r echo=FALSE, results='hide', message=FALSE}
+#Section 3: Demographics and Voting tendencies 
+
+##Analyzing OH demographics 
+#Strong negative relationship between Black and votes for Trump
+TrumpVoterPercentage<- as.numeric(OH$trump16/OH$cvap)
+cor(OH$black_pct,TrumpVoterPercentage)
+cor(TrumpVoterPercentage,OH$nonwhite_pct)
+cor(TrumpVoterPercentage,OH$white_pct)
+#plot(OH$black_pct,TrumpVoterPercentage,xlab= "Porportion of Black Population", ylab="Percentage of Eligible Voters that voted for Trump" )
+
+#Strong positive relationship between black and votes for Obama
+ObamaVoterPercentage<- as.numeric(OH$obama12/OH$cvap)
+cor(OH$black_pct,ObamaVoterPercentage)
+#plot(OH$black_pct,ObamaVoterPercentage,xlab= "Porportion of Black Population", ylab="Percentage of Eligible Voters that voted for Obama")
+
+#Strong negative relationship between white and votes for obama
+cor(ObamaVoterPercentage,OH$white_pct)
+
+#moderate negative correlation between foreign born and voting for Trump
+cor(OH$foreignborn_pct,TrumpVoterPercentage)
+
+#weak correlation in female,hispanic, less than high school or college education with voting for Trump
+cor(OH$female_pct,TrumpVoterPercentage)
+cor(OH$lesshs_pct,TrumpVoterPercentage)
+cor(OH$lesscollege_pct,TrumpVoterPercentage)
+cor(OH$hispanic_pct,TrumpVoterPercentage)
+
+##Analyzing PA Demographics
+#Strong negative relationship between Black, foreign born and votes for Trump
+PATrumpVoterPercentage<- as.numeric(PA$trump16/PA$cvap)
+cor(PA$black_pct,PATrumpVoterPercentage)
+#plot(PA$black_pct,PATrumpVoterPercentage)
+cor(PA$foreignborn_pct,PATrumpVoterPercentage)
+
+#Strong positive relationship between black and votes for Obama
+PAObamaVoterPercentage<- as.numeric(PA$obama12/PA$cvap)
+cor(PA$black_pct,PAObamaVoterPercentage)
+#plot(PA$black_pct,PAObamaVoterPercentage,xlab= "Porportion of Black Population", ylab="Percentage of Eligible Voters that voted for Obama")
+
+#Strong negative relationship between white and votes for obama
+cor(PAObamaVoterPercentage,PA$white_pct)
+
+#moderate correlation between less than college and hispanic with voting for Trump
+cor(PA$lesscollege_pct,PATrumpVoterPercentage)
+cor(PA$hispanic_pct,PATrumpVoterPercentage)
+
+#weak correlation in female,hispanic, less than high school with voting for Trump
+cor(PA$female_pct,PATrumpVoterPercentage)
+cor(PA$lesshs_pct,PATrumpVoterPercentage)
+
+```
+
+
+#Race and voting tendencies in past presidential elections
+
+* A correlation coefficient test of black population porportion and votes for Trump gave an value of - 0.636 in Ohio and -0.756 in Pennsylvania
+```{r message=FALSE, echo=FALSE}
+#GGplot of Black population porportion and Votes for Trump in OH
+library(scales)
+ggplot(OH, aes(x=OH$black_pct, y=TrumpVoterPercentage))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,60))+coord_cartesian(xlim=c(1.2,27))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of Black Population in each County", breaks=seq(0,30,5))+scale_y_continuous(name= "OH Trump Voter Percentage by County")
+```
+
+
+```{r message=FALSE, echo=FALSE}
+##GGplot of Black population porportion and Votes for Trump in PA
+ggplot(PA, aes(x=PA$black_pct, y=PATrumpVoterPercentage))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(1.5,40))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of Black Population in each County")+scale_y_continuous(name= "PA Trump Voter Percentage by County")
+```
+
+* A correlation coefficient test of white population porportion and votes for obama gave an value of 0.688 in Ohio and -0.719 in Pennsylvania
+```{r message=FALSE, echo=FALSE}
+#GGplot of White population porportion and Votes for Obama in OH
+ggplot(OH, aes(x=OH$white_pct, y=ObamaVoterPercentage))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(63,96))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of White Population in each County", breaks = seq(63,96,5))+ scale_y_continuous(name= "OH Obama Voter Percentage by County")
+```
+
+
+```{r message=FALSE, echo=FALSE}
+#GGplot of White population porportion and Votes for Obama in PA
+ggplot(PA, aes(x=PA$white_pct, y=PAObamaVoterPercentage))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(63,96))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of White Population in each County", breaks = seq(63,96,5))+ scale_y_continuous(name= "PA Obama Voter Percentage by County")
+```
+
+* Race is a strong indicator in voter tendencies with the effects been stronger in Ohio than Pennsylvania.
+```{r echo=FALSE, results=FALSE}
+#moderate correlation between black, white and Votes for Republican Congress member in OH
+RCongress<- OH$Rcongress18/OH$cvap
+cor(RCongress,OH$black_pct)
+cor(RCongress,OH$white_pct)
+
+#strong correlation between black, white and Votes for Democratic Congress member in OH
+DCongress<- OH$Dcongress18/OH$cvap
+cor(DCongress,OH$black_pct)
+cor(DCongress,OH$white_pct)
+
+#moderate to strong correlation between black, white and Republican Congress in PA
+PARCongress<- PA$Rcongress18/PA$cvap
+cor(PARCongress,PA$black_pct)
+cor(PARCongress,PA$white_pct)
+
+#moderate to strong correlation between black, white and Democratic Congress in PA
+PADCongress<- PA$Dcongress18/PA$cvap
+cor(PADCongress,PA$black_pct)
+cor(PADCongress,PA$white_pct)
+```
+
+#Race and Voting tendencies in OH 2018 Midterm Election. 
+
+* Race continues to be a strong indicator on how individual votes in 2018 Congress. The correlation is stronger when voting for Democratic Candidate in OH as well as Voting for Republican Candidate in PA. 
+
+```{r message=FALSE, echo=FALSE}
+#GGplot of Black population porportion and Votes for Democratic Congress Memeber in OH
+ggplot(OH, aes(x=OH$black_pct, y=DCongress))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(1.2,27))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of Black Population in each County", breaks=seq(0,30,5))+scale_y_continuous(name= "OH Democratic Voter Percentage")
+```
+
+
+```{r message=FALSE, echo=FALSE}
+#GGplot of White population porportion and Votes for Democratic Congress Memeber in OH
+ggplot(OH, aes(x=OH$white_pct, y=DCongress))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(62,96))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of White Population in each County", breaks=seq(60,100,5))+scale_y_continuous(name= "OH Democratic Voter Percentage")
+
+```
+
+
+#Race and Voting tendencies in PA 2018 Midterm Election.
+```{r message=FALSE, echo=FALSE}
+#GGplot of Black population porportion and Votes for Democratic Congress Memeber in PA
+ggplot(PA, aes(x=PA$black_pct, y=PADCongress))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(1.2,27))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of Black Population in each County", breaks=seq(0,30,5))+scale_y_continuous(name= "PA Democratic Voter Percentage")
+
+```
+
+
+```{r message=FALSE, echo=FALSE}
+#GGplot of White population porportion and Votes for Democratic Congress Memeber in OH
+ggplot(PA, aes(x=PA$white_pct, y=PADCongress))+ geom_point(size=2, shape=19, color= "black")+geom_smooth()+ coord_cartesian(ylim=c(0,100))+coord_cartesian(xlim=c(62,96))+ scale_y_continuous(labels= percent)+ scale_x_continuous(name= "Proportion of White Population in each County", breaks=seq(60,100,5))+scale_y_continuous(name= "PA Democratic Voter Percentage")
+
+```
+
+* There is a moderate negative correlation in foreign born and votes for trump, with the effect been stronger in PA than OH.
+
+* The are weak to moderate correlation between, female, hispanic, less than high school, less than college education and votes for Trump.

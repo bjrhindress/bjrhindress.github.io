@@ -1,0 +1,114 @@
+---
+title: "Rural Urban"
+author: "Alisa Hartle"
+date: "December 9, 2018"
+output: html_document
+---
+
+#Overview of Urban-Rural Counties in Pennsylvania and Ohio
+```{r}
+source("OHmerge.R")
+OH <- getOH() #FINAL OH DATA SET 
+source("PAmerge.R")
+PA <- getPA() #FINAL PA DATA SET 
+summary(OH$ruralurban_cc)
+summary(PA$ruralurban_cc)
+
+#Ruralurban_cc measures how rural an area is; 1 indicates counties of
+#1,000,000 people or more, while indicates a county with population < 2,500
+
+#The summary statistics of these two states show that  the median PA county is more "urban" than OH in terms of population density. However,PA also has a wider variation in county urban-rural spectrum (1-9 compared with OH's 1-8). 
+
+hist(PA$ruralurban_cc, breaks = 5)
+hist(OH$ruralurban_cc, breaks =5)
+
+#The histograms provide a little more insight. PA counties have a natural variation in population size between large, medium, and small. Ohio looks quite different. Ohio has high density populated counties like Pennyslvania, but fewer moderate-to-high denisty populated counties. This urban isolation in Ohio could be a possible predictor later on in the analysis.
+```
+
+#Distinguishing Between Counties
+```{r}
+pa_urban <-subset(PA, PA$ruralurban_cc == 1 | 
+                 PA$ruralurban_cc == 2)
+pa_suburb <- subset(PA, PA$ruralurban_cc == 3 |
+                     PA$ruralurban_cc == 4 | 
+                     PA$ruralurban_cc == 5)
+pa_rural <- subset(PA, PA$ruralurban_cc == 6 |
+                  PA$ruralurban_cc == 7 | 
+                  PA$ruralurban_cc == 8|
+                  PA$ruralurban_cc == 9|
+                  PA$ruralurban_cc == 10)
+
+#Out of 67 counties in Pennsylvania, 19 are rural, 21 are suburban, and 27 are urban.
+
+
+oh_urban <-subset(OH, OH$ruralurban_cc == 1 | 
+                 OH$ruralurban_cc == 2)
+oh_suburb <- subset(OH, OH$ruralurban_cc == 3 |
+                     OH$ruralurban_cc == 4 | 
+                     OH$ruralurban_cc == 5)
+oh_rural <- subset(OH, OH$ruralurban_cc == 6 |
+                  OH$ruralurban_cc == 7 | 
+                  OH$ruralurban_cc == 8|
+                  OH$ruralurban_cc == 9|
+                  OH$ruralurban_cc == 10)
+
+#Out of 88 counties in Ohio, 28 are rural, 27 are suburbs, and 33 are urban.
+```
+
+#Vote Test Function
+```{r}
+#vote_test provides a basic framework to compare percentage of Republican voters in two different datasets 
+#a and b are the datasets being compared
+#c and d are the races we're examining
+vote_test <- function(a, b, c, d) {
+  vote_test <-t.test(a[,c]/(a[,c]+a[,d]), b[,c]/(b[,c]+b[,d]))
+  return(vote_test)
+}
+
+```
+
+
+#Hypothesis 2a: rural counties are more likely to vote Republican and urban counties are more likely to vote Democratic
+```{r}
+vote_test(a=pa_rural,b=pa_urban, c="Dcongress18",d="Rcongress18")
+vote_test(a=pa_rural,b=pa_urban, c="demhouse16",d="rephouse16")
+vote_test(a=oh_rural,b=oh_urban, c="Dcongress18",d="Rcongress18")
+vote_test(a=oh_rural,b=oh_urban, c="demhouse16",d="rephouse16")
+```
+#Hypothesis 2b: Which rural or urban counties have the lowest margins between Republican and Democrat? Are there any predictors for these counties?
+```{r}
+#diff calculates the difference in % of the vote between Republican and Democratic candidate
+diff <- function(df, rep, dem) {
+  diff <- abs((df[,rep]/(df[,rep]+df[,dem]))-(df[,dem]/(df[,rep]+df[,dem])))
+}
+
+summary(diff(df=pa_rural, "Rcongress18","Dcongress18"))
+summary(diff(df=pa_suburb, "Rcongress18","Dcongress18"))
+summary(diff(df=pa_urban, "Rcongress18","Dcongress18"))
+
+PA_cong_marg <-subset(PA,diff(df=PA, "Rcongress18","Dcongress18")<.05)
+OH_cong_marg <-subset(OH,diff(df=OH, "Rcongress18","Dcongress18")<.05)
+
+#The number of counties with margins of less than 5% are so few that any analysis of these subsets would be insignificant. We're beginning to see the limits of this dataset.
+```
+
+#Hypothesis 2c: Rural and urban counties are most likely to vote “straight ticket” by electing the same party in multiple offices.
+```{r}
+
+```
+
+#Hypothesis 2d: For rural/urban districts that do not vote straight ticket, we’re hypothesising this has been a consistent trend.
+```{r}
+
+```
+
+#Hypothesis 2e: Suburban districts are most likely to “flip” between election cycles. Our hypothesis is that counties that have shifted politically in 2018 have shown similar behavior in the past.
+```{r}
+
+```
+
+#Hypothesis 2f: Additional demographic indicators such as education, race, or income could predict which suburban districts are most likely to flip in midterm elections.
+```{r}
+
+```
+
